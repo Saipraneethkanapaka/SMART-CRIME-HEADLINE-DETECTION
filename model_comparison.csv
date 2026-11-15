@@ -1,0 +1,7 @@
+Model,Accuracy,Precision,Recall,F1 Score
+Multinomial Naive Bayes,89.12,87.6,91.16,89.35
+Random Forest,88.7,90.95,85.97,88.39
+Logistic Regression,88.49,92.43,83.87,87.94
+Linear SVM,87.16,90.03,83.59,86.69
+Decision Tree,85.47,86.04,84.71,85.37
+KNN,51.93,93.75,4.21,8.05

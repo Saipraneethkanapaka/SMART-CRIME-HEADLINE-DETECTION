@@ -1,21 +1,89 @@
-import joblib
-
-model = joblib.load("crime_headline_model.pkl")
-vectorizer = joblib.load("tfidf_vectorizer.pkl")
 import streamlit as st
+import joblib
+import pandas as pd
+
+# =====================================
+# PAGE CONFIGURATION
+# =====================================
 
 st.set_page_config(
     page_title="Smart Crime Headline Detection",
-    page_icon="",
+    page_icon="🛡️",
     layout="centered"
 )
+
+# =====================================
+# LOAD MODEL FILES
+# =====================================
+
+@st.cache_resource
+def load_files():
+    model = joblib.load("crime_headline_model.pkl")
+    vectorizer = joblib.load("count_vectorizer.pkl")
+    metrics = joblib.load("model_metrics.pkl")
+    best_model_name = joblib.load("best_model_name.pkl")
+
+    return model, vectorizer, metrics, best_model_name
+
+
+try:
+    model, vectorizer, metrics, best_model_name = load_files()
+
+except Exception as e:
+    st.error(f"Error loading model files: {e}")
+    st.stop()
+
+
+# =====================================
+# VALIDATE MODEL METRICS
+# =====================================
+
+required_columns = [
+    "Model",
+    "Accuracy",
+    "Precision",
+    "Recall",
+    "F1 Score"
+]
+
+if not isinstance(metrics, pd.DataFrame):
+    st.error("Model metrics must be a Pandas DataFrame.")
+    st.stop()
+
+if not all(col in metrics.columns for col in required_columns):
+    st.error("Required columns are missing in model metrics.")
+    st.stop()
+
+if metrics.empty:
+    st.error("Model metrics file is empty.")
+    st.stop()
+
+best_matches = metrics[
+    metrics["Model"] == best_model_name
+]
+
+if best_matches.empty:
+    st.error("Best model not found in model metrics.")
+    st.stop()
+
+best_row = best_matches.iloc[0]
+
+
+# =====================================
+# CUSTOM CSS
+# =====================================
 
 st.markdown("""
 <style>
 
-/* ---------------- Background ---------------- */
+/* GLOBAL FONT AND BACKGROUND */
 
-.stApp{
+html, body, [class*="st-"],
+[data-testid="stAppViewContainer"] {
+    font-family: "Segoe UI", Arial, sans-serif !important;
+}
+
+.stApp {
     background: linear-gradient(
         135deg,
         #ffffff 0%,
@@ -23,329 +91,526 @@ st.markdown("""
         #eef6ff 70%,
         #dfefff 100%
     );
+    color: #1e293b;
 }
 
-/* Hide Streamlit header/footer */
+/* HIDE DEFAULT STREAMLIT ELEMENTS */
 
-#MainMenu {visibility:hidden;}
-footer {visibility:hidden;}
-header {visibility:hidden;}
-
-/* ---------------- Title ---------------- */
-
-.main-title{
-    text-align:center;
-    margin-top:20px;
-    margin-bottom:8px;
+#MainMenu, footer, header {
+    visibility: hidden;
 }
 
-.logo{
-    font-size:48px;
+/* HEADINGS */
+
+h1, h2, h3, h4, h5, h6,
+.stMarkdown h1,
+.stMarkdown h2,
+.stMarkdown h3 {
+    color: #0f172a !important;
+    font-family: "Segoe UI", Arial, sans-serif !important;
+    font-weight: 700 !important;
 }
 
-.title-text{
-    color:#0F172A;
-    font-size:42px;
-    font-weight:800;
-    letter-spacing:1px;
-    font-family:'Segoe UI',sans-serif;
+/* NORMAL TEXT */
+
+p, li,
+.stMarkdown p,
+.stMarkdown li,
+[data-testid="stMarkdownContainer"] {
+    color: #334155;
+    font-family: "Segoe UI", Arial, sans-serif !important;
 }
 
-/* ---------------- Subtitle ---------------- */
+/* MAIN TITLE */
 
-.subtitle{
-    text-align:center;
-    color:#64748B;
-    font-size:18px;
-    margin-bottom:35px;
+.main-title {
+    text-align: center;
+    margin-top: 20px;
+    margin-bottom: 8px;
 }
 
-/* ---------------- Label ---------------- */
-
-label{
-    color:#1E293B !important;
-    font-size:18px !important;
-    font-weight:600 !important;
+.title-text {
+    color: #0f172a !important;
+    font-size: 36px;
+    font-weight: 800;
+    font-family: "Segoe UI", Arial, sans-serif !important;
 }
 
-/* ---------------- Text Area ---------------- */
-
-textarea{
-
-    background:rgba(255,255,255,.75) !important;
-
-    backdrop-filter:blur(10px);
-    -webkit-backdrop-filter:blur(10px);
-
-    color:#111827 !important;
-
-    border:2px solid #C7DFFF !important;
-
-    border-radius:16px !important;
-
-    padding:16px !important;
-
-    font-size:17px !important;
-
-    box-shadow:0 10px 25px rgba(37,99,235,.08);
-
-    transition:all .3s ease;
+.subtitle {
+    text-align: center;
+    color: #64748b !important;
+    font-size: 17px;
+    margin-bottom: 30px;
 }
 
-textarea:focus{
+/* INPUT LABELS */
 
-    background:white !important;
-
-    border:2px solid #2563EB !important;
-
-    box-shadow:0 0 0 5px rgba(37,99,235,.15) !important;
+label,
+[data-testid="stWidgetLabel"] p {
+    color: #1e293b !important;
+    font-size: 16px !important;
+    font-weight: 600 !important;
+    font-family: "Segoe UI", Arial, sans-serif !important;
 }
 
-textarea::placeholder{
-    color:#94A3B8 !important;
+/* TEXT AREA */
+
+textarea, input {
+    background: rgba(255, 255, 255, 0.88) !important;
+    color: #111827 !important;
+    border: 2px solid #c7dfff !important;
+    border-radius: 14px !important;
+    font-family: "Segoe UI", Arial, sans-serif !important;
+    font-size: 16px !important;
 }
 
-/* ---------------- Button ---------------- */
-
-div.stButton > button{
-
-    width:100%;
-
-    height:54px;
-
-    border:none;
-
-    border-radius:14px;
-
-    background:linear-gradient(90deg,#2563EB,#3B82F6);
-
-    color:white;
-
-    font-size:18px;
-
-    font-weight:700;
-
-    transition:.3s;
+textarea {
+    padding: 16px !important;
+    box-shadow: 0 8px 22px rgba(37, 99, 235, 0.07);
 }
 
-div.stButton > button:hover{
-
-    background:linear-gradient(90deg,#1D4ED8,#2563EB);
-
-    transform:translateY(-2px);
-
-    box-shadow:0 8px 20px rgba(37,99,235,.25);
+textarea:focus, input:focus {
+    border: 2px solid #2563eb !important;
+    box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.13) !important;
 }
 
-/* Success & Warning */
+/* BUTTONS */
 
-div[data-testid="stSuccess"],
-div[data-testid="stWarning"]{
-    border-radius:12px;
+div.stButton > button {
+    width: 100%;
+    min-height: 52px;
+    border: none;
+    border-radius: 14px;
+    background: linear-gradient(
+        90deg,
+        #2563eb,
+        #3b82f6
+    );
+    color: #ffffff !important;
+    font-family: "Segoe UI", Arial, sans-serif !important;
+    font-size: 17px;
+    font-weight: 700;
 }
 
-/* ---------- Metric Cards ---------- */
+div.stButton > button:hover {
+    background: linear-gradient(
+        90deg,
+        #1d4ed8,
+        #2563eb
+    );
+    color: #ffffff !important;
+}
 
-/* Metric Card */
+/* METRICS */
+
 div[data-testid="stMetric"] {
-    background: rgba(255,255,255,0.95);
+    background: rgba(255, 255, 255, 0.82);
     border-radius: 12px;
     padding: 15px;
-    border: 1px solid #C7DFFF;
+    border: 1px solid #c7dfff;
 }
 
-/* Metric Label */
-div[data-testid="stMetric"] label {
-    color: #1E293B !important;
-    font-size: 16px !important;
+div[data-testid="stMetric"] label,
+div[data-testid="stMetricLabel"] {
+    color: #334155 !important;
+    font-size: 14px !important;
     font-weight: 700 !important;
 }
 
-/* Metric Value */
-div[data-testid="stMetric"] div {
-    color: #2563EB !important;
+div[data-testid="stMetricValue"],
+div[data-testid="stMetricValue"] div {
+    color: #1d4ed8 !important;
+    font-weight: 750 !important;
 }
 
-/* Subheaders */
-h3 {
-    color: #1E293B !important;
-    font-weight: 700 !important;
+/* PROJECT INFORMATION CARD */
+
+.project-card {
+    background: rgba(255, 255, 255, 0.78);
+    padding: 20px;
+    border-radius: 15px;
+    border: 1px solid #c7dfff;
+    text-align: center;
+    margin-bottom: 25px;
+    box-shadow: 0 5px 15px rgba(37, 99, 235, 0.07);
 }
 
-/* Main headers */
-h1, h2 {
-    color: #0F172A !important;
+.project-card h3 {
+    color: #2563eb !important;
+}
+
+.project-card p {
+    color: #475569 !important;
+}
+
+/* CAPTIONS */
+
+.stCaption,
+[data-testid="stCaption"],
+[data-testid="stCaptionContainer"] {
+    color: #64748b !important;
+    font-family: "Segoe UI", Arial, sans-serif !important;
+}
+
+/* ALERTS */
+
+[data-testid="stAlert"] {
+    border-radius: 12px;
+    font-family: "Segoe UI", Arial, sans-serif !important;
+}
+
+/* DATAFRAME */
+
+[data-testid="stDataFrame"] {
+    border: 1px solid #c7dfff;
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+/* FOOTER */
+
+.footer {
+    text-align: center;
+    padding: 20px;
+    background: rgba(255, 255, 255, 0.78);
+    border-radius: 15px;
+    border: 1px solid #c7dfff;
+    margin-top: 30px;
+    color: #64748b !important;
+    font-family: "Segoe UI", Arial, sans-serif !important;
 }
 
 </style>
 """, unsafe_allow_html=True)
 
-# ---------- Heading ----------
+
+# =====================================
+# MAIN HEADING
+# =====================================
 
 st.markdown("""
 <div class="main-title">
-<span class="logo">🛡️</span>
-<span class="title-text">SMART CRIME HEADLINE DETECTION</span>
+    <span style="font-size:45px;">🛡️</span>
+    <span class="title-text">
+        SMART CRIME HEADLINE DETECTION
+    </span>
+</div>
+
+<div class="subtitle">
+    AI-powered classification of crime-related news headlines
 </div>
 """, unsafe_allow_html=True)
+
+
+# =====================================
+# PROJECT INFORMATION
+# =====================================
 
 st.markdown("""
-<div class="subtitle">
-AI-powered classification of crime-related news headlines
+<div class="project-card">
+
+<h3>📊 Machine Learning Project</h3>
+
+<p style="font-size:17px;">
+    Project Type: <b>Binary Classification</b>
+</p>
+
+<p>
+    Classifies news headlines into two categories:
+    <b>Crime</b> and <b>Non-Crime</b>.
+</p>
+
+<p>
+    Feature Extraction: CountVectorizer
+</p>
+
+<p>
+    Machine Learning Models: 6 Algorithms
+</p>
+
 </div>
 """, unsafe_allow_html=True)
 
-# ---------- Input ----------
+
+# =====================================
+# SESSION STATE
+# =====================================
+
+if "prediction_history" not in st.session_state:
+    st.session_state.prediction_history = []
+
+
+# =====================================
+# HEADLINE INPUT
+# =====================================
+
+st.subheader("📝 Enter Crime Headline")
 
 headline = st.text_area(
-    "📝 Enter Crime Headline",
-    height=190,
-    placeholder="Type or paste a crime news headline here..."
+    "Enter your news headline",
+    height=150,
+    placeholder="Type or paste a crime news headline here...",
+    key="headline_input"
 )
 
 st.write("")
 
-# ---------- Prediction ----------
 
-# -------------------------------
-# Prediction
-# -------------------------------
+# =====================================
+# BUTTONS
+# =====================================
 
-if st.button("🚀 Predict"):
+col1, col2 = st.columns(2)
 
-    if headline.strip() == "":
-        st.warning("⚠ Please enter a news headline.")
+with col1:
+    predict_button = st.button(
+        "🚀 Predict",
+        use_container_width=True
+    )
+
+with col2:
+    clear_button = st.button(
+        "🗑️ Clear",
+        use_container_width=True
+    )
+
+
+if clear_button:
+    st.session_state.prediction_history = []
+    st.session_state.pop("headline_input", None)
+    st.rerun()
+
+
+# =====================================
+# PREDICTION
+# =====================================
+
+if predict_button:
+
+    if not headline.strip():
+
+        st.warning("⚠️ Please enter a news headline.")
 
     else:
 
-        # Word & Character Count
-        words = len(headline.split())
-        characters = len(headline)
+        try:
 
-        # Convert headline into TF-IDF features
-        transformed_text = vectorizer.transform([headline])
+            # TRANSFORM HEADLINE
 
-        # Prediction
-        prediction = model.predict(transformed_text)[0]
+            transformed_text = vectorizer.transform([headline])
 
-        # Probability
-        probability = model.predict_proba(transformed_text)[0]
+            # PREDICT CATEGORY
 
-        # Probabilities
-        crime_prob = probability[1] * 100
-        not_crime_prob = probability[0] * 100
+            prediction = model.predict(transformed_text)[0]
 
-        st.divider()
+            # =====================================
+            # CONFIDENCE SCORE
+            # =====================================
 
-        # -----------------------------------
-        # Headline
-        # -----------------------------------
+            confidence = None
 
-        st.subheader("📰 Your Headline")
-        st.info(headline)
+            if hasattr(model, "predict_proba"):
 
-        # -----------------------------------
-        # Statistics
-        # -----------------------------------
+                probabilities = model.predict_proba(
+                    transformed_text
+                )[0]
 
-        st.subheader("📊 Headline Statistics")
+                predicted_index = list(model.classes_).index(
+                    prediction
+                )
 
-        col1, col2 = st.columns(2)
+                confidence = float(
+                    probabilities[predicted_index] * 100
+                )
 
-        with col1:
-            st.metric("Words", words)
+            # =====================================
+            # DISPLAY PREDICTION
+            # =====================================
 
-        with col2:
-            st.metric("Characters", characters)
+            st.divider()
 
-        # -----------------------------------
-        # Prediction
-        # -----------------------------------
+            st.header("🔍 Prediction Result")
 
-        st.subheader("🤖 Prediction")
+            if prediction == 1:
 
-        if prediction == 1:
-            st.error("🚨 Crime Headline Detected")
-        else:
-            st.success("✅ Not a Crime Headline")
+                st.error("🚨 Crime Headline Detected")
+                result_text = "Crime"
 
-        # -----------------------------------
-        # Confidence
-        # -----------------------------------
+            elif prediction == 0:
 
-        st.subheader("🎯 Prediction Confidence")
+                st.success("✅ Not a Crime Headline")
+                result_text = "Non-Crime"
 
-        col1, col2 = st.columns(2)
+            else:
 
-        with col1:
-            st.metric("🚨 Crime", f"{crime_prob:.2f}%")
-            st.progress(int(crime_prob))
+                result_text = str(prediction)
+                st.info(f"Prediction: {result_text}")
 
-        with col2:
-            st.metric("✅ Not Crime", f"{not_crime_prob:.2f}%")
-            st.progress(int(not_crime_prob))
+            # =====================================
+            # CONFIDENCE DISPLAY
+            # =====================================
 
-        # -----------------------------------
-        # Risk Assessment
-        # -----------------------------------
+            st.subheader("🎯 Prediction Confidence")
 
-        st.subheader("🚦 Risk Assessment")
+            if confidence is not None:
 
-        if crime_prob >= 90:
-            st.error("🔴 Very High Crime Probability")
+                st.metric(
+                    label="Model Confidence",
+                    value=f"{confidence:.2f}%"
+                )
 
-        elif crime_prob >= 70:
-            st.warning("🟠 High Crime Probability")
+                st.caption(
+                    "Probability assigned to the predicted "
+                    "class by the trained model. This is not "
+                    "necessarily a calibrated probability."
+                )
 
-        elif crime_prob >= 50:
-            st.warning("🟡 Moderate Crime Probability")
+            else:
 
-        elif crime_prob >= 30:
-            st.info("🔵 Low Crime Probability")
+                st.info(
+                    "Probability-based confidence is unavailable "
+                    "for this model."
+                )
 
-        else:
-            st.success("🟢 Very Low Crime Probability")
-            
-            
-st.markdown("---")
+            # =====================================
+            # SAVE PREDICTION HISTORY
+            # =====================================
 
-st.markdown("""
-<div style="
-    text-align:center;
-    padding:20px;
-    background:rgba(255,255,255,0.85);
-    border-radius:15px;
-    border:1px solid #C7DFFF;
-    box-shadow:0 5px 15px rgba(37,99,235,0.10);
-">
+            st.session_state.prediction_history.append({
 
-<h3 style="
-    color:#2563EB;
-    margin-bottom:10px;
-">
-🛡️ Smart Crime Headline Detection
-</h3>
+                "Headline": headline,
 
-<p style="
-    color:#475569;
-    font-size:15px;
-    margin:5px;
-">
-AI-powered Crime vs Non-Crime News Classification
-</p>
+                "Prediction": result_text,
 
-<p style="
-    color:#64748B;
-    font-size:14px;
-    margin:5px;
-">
-Built with ❤️ using
-<b>Python</b> •
-<b>Streamlit</b> •
-<b>Scikit-learn</b> •
-<b>TF-IDF</b> •
-<b>Machine Learning Models</b>
-</p>
+                "Confidence": (
+                    f"{confidence:.2f}%"
+                    if confidence is not None
+                    else "Unavailable"
+                )
 
-</div>
-""", unsafe_allow_html=True)
+            })
+
+            # =====================================
+            # MODEL COMPARISON
+            # =====================================
+
+            st.divider()
+
+            st.header(
+                "📊 Machine Learning Model Comparison"
+            )
+
+            st.write(
+                "Performance comparison of six trained "
+                "machine learning classification algorithms."
+            )
+
+            # =====================================
+            # BEST PERFORMING MODEL
+            # =====================================
+
+            st.divider()
+
+            st.subheader("🏆 Best Performing Model")
+
+            st.markdown(
+                f"### {best_model_name}"
+            )
+
+            st.metric(
+                label="Test Accuracy",
+                value=f"{best_row['Accuracy']:.2f}%"
+            )
+
+            # =====================================
+            # COMPLETE MODEL PERFORMANCE TABLE
+            # =====================================
+
+            st.divider()
+
+            st.subheader(
+                "🥇 Complete Model Performance Ranking"
+            )
+
+            display_df = metrics.copy()
+
+            display_df = display_df.sort_values(
+                by="F1 Score",
+                ascending=False
+            ).reset_index(drop=True)
+
+            display_df.insert(
+                0,
+                "Rank",
+                range(1, len(display_df) + 1)
+            )
+
+            display_df = display_df.rename(
+                columns={
+                    "Model": "Machine Learning Model",
+                    "Accuracy": "Accuracy (%)",
+                    "Precision": "Precision (%)",
+                    "Recall": "Recall (%)",
+                    "F1 Score": "F1 Score (%)"
+                }
+            )
+
+            st.dataframe(
+                display_df,
+                use_container_width=True,
+                hide_index=True
+            )
+
+            # =====================================
+            # FINAL RESULT
+            # =====================================
+
+            st.success(
+                f"🏆 {best_model_name} is the best-performing "
+                "model based on F1 Score."
+            )
+
+            st.caption(
+                "All evaluation metrics are calculated using "
+                "the held-out test dataset."
+            )
+
+        except Exception as e:
+
+            st.error(
+                f"An error occurred during prediction: {e}"
+            )
+
+
+# =====================================
+# PREDICTION HISTORY
+# =====================================
+
+# Uncomment this section if you want prediction history.
+
+if st.session_state.prediction_history:
+
+    st.divider()
+    st.subheader("📜 Prediction History")
+
+    history_df = pd.DataFrame(
+        st.session_state.prediction_history
+    )
+
+    st.dataframe(
+        history_df,
+        use_container_width=True,
+        hide_index=True
+    )
+
+    csv_data = history_df.to_csv(
+        index=False
+    ).encode("utf-8")
+
+    st.download_button(
+        label="⬇️ Download Prediction History",
+        data=csv_data,
+        file_name="crime_prediction_history.csv",
+        mime="text/csv",
+        use_container_width=True
+    )
